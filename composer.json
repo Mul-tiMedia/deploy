@@ -26,7 +26,7 @@
     "symfony/process": "^5.0",
     "phpseclib/phpseclib": "^2.0",
     "laravel/framework": "^7.0|^8.0",
-    "guzzlehttp/guzzle": "^7.1@dev"
+    "guzzlehttp/guzzle": "^6.0|^7.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^8.5|^9.3",
