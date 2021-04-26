@@ -8,16 +8,15 @@ use Deploy\Http\Requests\DeploymentRequest;
 use Deploy\Jobs\DeployJob;
 use Deploy\ProviderRepository\Reference;
 use Deploy\DeploymentManager;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\JsonResponse;
 
 class ProjectDeploymentsController extends Controller
 {
     /**
      * List deployments.
-     *
-     * @param  \Deploy\Models\Project $project
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function index(Project $project)
+    public function index(Project $project): JsonResponse
     {
         $this->authorize('view', $project);
 
@@ -33,11 +32,9 @@ class ProjectDeploymentsController extends Controller
     /**
      * Show deployment.
      *
-     * @param  \Deploy\Models\Project $project
-     * @param  \Deploy\Models\Deployment $deployment
-     * @return \Illuminate\Http\JsonResponse
+     * @throws AuthorizationException
      */
-    public function show(Project $project, Deployment $deployment)
+    public function show(Project $project, Deployment $deployment): JsonResponse
     {
         if ($project->id !== $deployment->project_id) {
             abort(404, 'Not found.');
@@ -56,17 +53,14 @@ class ProjectDeploymentsController extends Controller
     /**
      * Create deployment and dispatch queue.
      *
-     * @param  \Deploy\Http\Requests\DeploymentRequest $request
-     * @param  \Deploy\Models\Project $project
-     * @return \Illuminate\Http\JsonResponse
+     * @throws AuthorizationException
      */
-    public function store(DeploymentRequest $request, Project $project)
+    public function store(DeploymentRequest $request, Project $project): JsonResponse
     {
         $this->authorize('view', $project);
 
         $reference = new Reference($request->input('reference'), $request->input('name'));
         $deploy = new DeploymentManager($project, $reference);
-
         $deployment = $deploy->create();
 
         dispatch(new DeployJob($deployment, $project));

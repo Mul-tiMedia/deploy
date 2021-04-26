@@ -2,39 +2,41 @@
 
 namespace Deploy\Processors;
 
+use Deploy\Contracts\Processors\ProcessorInterface;
+use Deploy\Events\ProcessorErrorEvent;
 use Deploy\Events\ServerConnectionTested;
 use Deploy\Models\Server;
 use Deploy\Ssh\Client;
-use Exception;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 
-class ServerConnectionProcessor extends AbstractProcessor
+class ServerConnectionProcessor extends AbstractProcessor implements ProcessorInterface
 {
     /**
-     * @var \Deploy\Models\Server
+     * @var Server
      */
     public $server;
 
     /**
-     * Instantiate.
-     * 
-     * @return void
+     * Set server.
      */
-    public function __construct(Server $server)
+    public function setServer(Server $server): self
     {
         $this->server = $server;
+
+        return $this;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function fire()
+    public function fire(): void
     {
         $successful = false;
         
         try {
             $client = new Client($this->getHost($this->server));
+
             $client = $client
                 ->setTimeout(30)
                 ->getProcess();
@@ -46,10 +48,19 @@ class ServerConnectionProcessor extends AbstractProcessor
             }
             
             $successful = true;
-        } catch (ProcessFailedException $e) {
-            Log::error($e->getMessage());
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
+        } catch (ProcessFailedException | ProcessTimedOutException $exception) {
+            $message = $exception->getProcess()->getErrorOutput();
+
+            if ($exception instanceof ProcessTimedOutException) {
+                $message = 'Process timed out trying to connect to server. Make sure the server details are correct.';
+            }
+
+            event(new ProcessorErrorEvent(
+                'Server connection test issue',
+                $this->server->user_id,
+                $this->server,
+                $message
+            ));
         }
         
         $server = Server::find($this->server->id);

@@ -2,21 +2,24 @@
 
 namespace Deploy\ProviderOauth;
 
+use GuzzleHttp\Client;
+
 abstract class AbstractProviderOauth
 {
     /**
      * Provider client id.
-     *
      * @var string
      */
     protected $clientId;
 
     /**
      * Provider client secret.
-     *
      * @var string
      */
     protected $clientSecret;
+
+    /** @var mixed */
+    protected $client;
 
     /**
      * Instantiate OAuth instance.
@@ -55,7 +58,7 @@ abstract class AbstractProviderOauth
      * Retrieve the access token from the provider.
      *
      * @param  string $code
-     * @return \Deploy\Contracts\ProviderOauth\ProviderOauthResourceInterface
+     * @return ProviderOauthResourceInterface
      */
     abstract public function requestAccessToken($code);
 
@@ -64,7 +67,7 @@ abstract class AbstractProviderOauth
      * access token. A new access token is provided when the refresh token is used.
      *
      * @param  string $refreshToken
-     * @return array
+     * @return ProviderOauthResourceInterface
      */
     abstract public function refreshAccessToken($refreshToken);
 
@@ -86,5 +89,30 @@ abstract class AbstractProviderOauth
     public function getClientSecret()
     {
         return $this->clientSecret;
+    }
+
+    /**
+     * Set http client.
+     *
+     * @param mixed $client
+     * @return void
+     */
+    public function setHttpClient($client)
+    {
+        $this->client = $client;
+    }
+
+    /**
+     * Returns http client.
+     *
+     * @return return mixed
+     */
+    public function getHttpClient()
+    {
+        if (null === $this->client) {
+            return new Client();
+        }
+
+        return $this->client;
     }
 }

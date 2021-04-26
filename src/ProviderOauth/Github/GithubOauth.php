@@ -2,17 +2,39 @@
 
 namespace Deploy\ProviderOauth\Github;
 
+use Deploy\Contracts\ProviderOauth\ProviderOauthInterface;
 use Deploy\ProviderOauth\AbstractProviderOauth;
-use GuzzleHttp\Client;
 
-class GithubOauth extends AbstractProviderOauth
+class GithubOauth extends AbstractProviderOauth implements ProviderOauthInterface
 {
+    /**
+     * Authorization scopes.
+     *
+     * @var array
+     */
+    public $scopes = ['repo'];
+
+    /**
+     * Returns provider friendly name typically stored in the providers table.
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        return 'github';
+    }
+
     /**
      * {@inheritdoc}
      */
     public function getAuthorizeUrl()
     {
-        return 'https://github.com/login/oauth/authorize?client_id=' . $this->getClientId();
+        $queries = [
+            'client_id' => $this->getClientId(),
+            'scope' => implode($this->scopes),
+        ];
+
+        return 'https://github.com/login/oauth/authorize?' . http_build_query($queries);
     }
 
     /**
@@ -36,7 +58,7 @@ class GithubOauth extends AbstractProviderOauth
      */
     public function requestAccessToken($code)
     {
-        $client = new Client();
+        $client = $this->getHttpClient();
 
         $response = $client->request('POST', $this->getApiUrl(), [
             'headers' => [

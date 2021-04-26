@@ -2,6 +2,7 @@
 
 namespace Deploy\Processors;
 
+use Deploy\Models\ProjectServer;
 use Deploy\ProviderOauthManager;
 use Deploy\Models\Deployment;
 use Deploy\Models\Process;
@@ -14,57 +15,68 @@ use Deploy\ProviderRepository\Commit;
 use Deploy\Deployment\Sequences;
 use Deploy\Deployment\CommandParser;
 use DateTime;
+use Deploy\Contracts\Processors\ProcessorInterface;
+use Deploy\Events\ProcessorErrorEvent;
+use Deploy\ProviderOauth\ProviderOauthFactory;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 
-class DeploymentProcessor extends AbstractProcessor
+class DeploymentProcessor extends AbstractProcessor implements ProcessorInterface
 {
-    
-    /**
-     * @var \Deploy\Models\Deployment
-     */
+    /** @var Deployment */
     private $deployment;
     
-    /**
-     * @var \Deploy\Models\Project
-     */
+    /** @var Project */
     private $project;
     
-    /**
-     * @var string
-     */
+    /** @var string */
     private $time;
     
-    /**
-     * @var array
-     */
+    /** @var array */
     private $output = [];
     
-    /**
-     * @var \Deploy\Deployment\Scripts
-     */
+    /** @var Scripts */
     private $deploymentScripts;
-    
+
+    /** @var ProviderOauthManager */
+    private $providerOauthManager;
+
     /**
-     * Instantiate constructor.
-     *
-     * @param  \Deploy\Models\Deployment $deployment
-     * @param  \Deploy\Models\Project $project
+     * @param ProviderOauthManager $providerOauthManager
      * @return void
      */
-    public function __construct($deployment, $project)
+    public function __construct(ProviderOauthManager $providerOauthManager)
     {
-        $this->deploymentScripts = new Scripts($project);
-        $this->deployment = $deployment;
-        $this->project = $project;
+        $this->providerOauthManager = $providerOauthManager;
         $this->time = (new DateTime())->format('YmdHis');
+    }
+
+    /**
+     * Set project.
+     */
+    public function setProject(Project $project): self
+    {
+        $this->project = $project;
+        $this->deploymentScripts = new Scripts($project);
+
+        return $this;
+    }
+
+    /**
+     * Set deployment associated with project.
+     */
+    public function setDeployment(Deployment $deployment): self
+    {
+        $this->deployment = $deployment;
+
+        return $this;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function fire()
+    public function fire(): void
     {
         $status = Deployment::FINISHED;
         
@@ -82,27 +94,25 @@ class DeploymentProcessor extends AbstractProcessor
                     break;
                 }
             }
-        } catch (ProcessFailedException $e) {
+        } catch (ProcessFailedException | Exception $exception) {
             $status = Deployment::FAILED;
             
-            Log::info($e->getTraceAsString());
-        } catch (Exception $e) {
-            $status = Deployment::FAILED;
-            
-            Log::info($e->getTraceAsString());
+            event(new ProcessorErrorEvent(
+                'Deployment issue',
+                $this->deployment->project->user_id,
+                $this->deployment,
+                $exception
+            ));
         }
         
         $this->updateRemainingProcessesAsCancelled($this->deployment);
         $this->updateDeploymentAsFinished($status);
     }
-    
+
     /**
      * Run through each process in a sequence. Gather exit codes and output.
-     *
-     * @param  array $sequence
-     * @return integer
      */
-    public function runSequence(array $sequence)
+    public function runSequence(array $sequence): int
     {
         $exitCode = 0;
         
@@ -150,12 +160,8 @@ class DeploymentProcessor extends AbstractProcessor
     
     /**
      * Update the deployment with the fetched commit data.
-     *
-     * @param  \Deploy\Models\Project $project
-     * @param  \Deploy\Models\Deployment $deployment
-     * @return void
      */
-    public function updateDeploymentCommitData(Project $project, Deployment $deployment)
+    public function updateDeploymentCommitData(Project $project, Deployment $deployment): void
     {
         $commit = new Commit($deployment->reference, $deployment->branch);
         $commitData = $commit->getByProject($project);
@@ -172,10 +178,9 @@ class DeploymentProcessor extends AbstractProcessor
     /**
      * Update deployment as deploying.
      *
-     * @param  \Deploy\Models\Deployment $deployment
-     * @return null
+     * @param Deployment $deployment
      */
-    public function updateDeploymentAsDeploying($deployment)
+    public function updateDeploymentAsDeploying($deployment): void
     {
         $deployment->fill([
             'status' => 3,
@@ -189,11 +194,8 @@ class DeploymentProcessor extends AbstractProcessor
     
     /**
      * Update deployment as finished.
-     *
-     * @param  integer $status
-     * @return void
      */
-    public function updateDeploymentAsFinished($status)
+    public function updateDeploymentAsFinished(int $status): void
     {
         $deployment = $this->deployment;
         $deployment->fill([
@@ -210,10 +212,9 @@ class DeploymentProcessor extends AbstractProcessor
     /**
      * Update any remaining processes as cancelled.
      *
-     * @param  \Deploy\Models\Deployment $deployment
-     * @return void
+     * @param Deployment $deployment
      */
-    public function updateRemainingProcessesAsCancelled($deployment)
+    public function updateRemainingProcessesAsCancelled($deployment): void
     {
         $processes = $deployment->processes()
             ->where('status', 0)
@@ -228,10 +229,9 @@ class DeploymentProcessor extends AbstractProcessor
     /**
      * Calculate duration from step progress.
      *
-     * @param  array $deployment
-     * @return integer
+     * @param Deployment $deployment
      */
-    public function calculateDuration($deployment)
+    public function calculateDuration($deployment): int
     {
         $duration = 0;
         
@@ -245,17 +245,20 @@ class DeploymentProcessor extends AbstractProcessor
     /**
      * Return process' parsed script.
      *
-     * @param  array $process
-     * @return string
+     * @param Process $process
      */
-    public function getScript($process)
+    public function getScript($process): string
     {
+        $projectServer = ProjectServer::where('project_id', $this->project->id)
+            ->where('server_id', $process->server->id)
+            ->firstOrFail();
+
         $commandParser = new CommandParser([
             'symlink'      => 'ln -nfs',
             'repository'   => $this->getProviderTarball(),
-            'project'      => $process->server->project_path,
-            'releases'     => $process->server->project_path . '/releases',
-            'release'      => $process->server->project_path . '/releases/' . $this->time,
+            'project'      => $projectServer->project_path,
+            'releases'     => $projectServer->project_path . '/releases',
+            'release'      => $projectServer->project_path . '/releases/' . $this->time,
             'time'         => $this->time,
         ]);
         
@@ -267,10 +270,9 @@ class DeploymentProcessor extends AbstractProcessor
     /**
      * Return script for action or action hook.
      *
-     * @param  \Deploy\Models\Process $process
-     * @return string
+     * @param Process $process
      */
-    public function getHookScript($process)
+    public function getHookScript($process): string
     {
         if ($process->hook_id) {
             return $process->hook->script;
@@ -291,17 +293,26 @@ class DeploymentProcessor extends AbstractProcessor
     
     /**
      * Get link for provider tarball.
-     *
-     * @return string
      */
-    public function getProviderTarball()
+    public function getProviderTarball(): string
     {
         if ($this->project->provider_id === 1) {
-            return '--header="Authorization: Bearer ' . $this->getAccessToken() . '" https://bitbucket.org/' . $this->project->repository . '/get/' . $this->deployment->commit . '.tar.gz';
+            return '--header="Authorization: Bearer '
+                . $this->getAccessToken()
+                . '" https://bitbucket.org/'
+                . $this->project->repository
+                . '/get/'
+                . $this->deployment->commit
+                . '.tar.gz';
         }
         
         if ($this->project->provider_id === 2) {
-            return 'https://api.github.com/repos/' . $this->project->repository . '/tarball/' . $this->deployment->commit . '?access_token=' . $this->getAccessToken();
+            return '--header="Authorization: Bearer '
+                . $this->getAccessToken()
+                . '" https://api.github.com/repos/'
+                . $this->project->repository
+                . '/tarball/'
+                . $this->deployment->commit;
         }
         
         return '';
@@ -309,12 +320,18 @@ class DeploymentProcessor extends AbstractProcessor
     
     /**
      * Return provider access token from project user.
-     *
-     * @return string
      */
-    protected function getAccessToken()
+    protected function getAccessToken(): string
     {
-        $oauth = new ProviderOauthManager($this->project->provider, $this->project->user);
+        $provider = $this->project
+            ->provider
+            ->friendly_name;
+
+        $providerOauth = ProviderOauthFactory::create($provider);
+
+        $oauth = $this->providerOauthManager
+            ->setProvider($providerOauth)
+            ->setUser($this->project->user);
     
         return $oauth->getAccessToken();
     }

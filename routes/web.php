@@ -24,6 +24,7 @@ Route::group(['prefix' => 'api'], function() {
     // Project's actions
     Route::get('projects/{project}/actions', 'ProjectActionsController@index')->name('project-actions.index');
     Route::get('projects/{project}/actions/{action}', 'ProjectActionsController@show')->name('project-actions.show');
+    Route::put('projects/{project}/actions/{action}/hook-order', 'ProjectActionsController@updateHookOrder')->name('project-actions.update-hook-order');
 
     // Project action's hooks
     Route::get('projects/{project}/actions/{action}/hooks/{hook}', 'ProjectActionHooksController@show')->name('project-action-hooks.show');
@@ -32,13 +33,11 @@ Route::group(['prefix' => 'api'], function() {
     Route::delete('projects/{project}/actions/{action}/hooks/{hook}', 'ProjectActionHooksController@destroy')->name('project-action-hooks.destroy');
 
     // Project's servers
-    Route::post('projects/{project}/servers', 'ProjectServerController@store')->name('project-servers.store');
+    Route::get('projects/{project}/servers', 'ProjectServerController@index')->name('project-servers.index');
     Route::get('projects/{project}/servers/{server}', 'ProjectServerController@show')->name('project-servers.show');
     Route::put('projects/{project}/servers/{server}', 'ProjectServerController@update')->name('project-servers.update');
+    Route::post('projects/{project}/servers', 'ProjectServerController@store')->name('project-servers.store');
     Route::delete('projects/{project}/servers/{server}', 'ProjectServerController@destroy')->name('project-servers.destroy');
-
-    // Project's server test connection
-    Route::get('projects/{project}/servers/{server}/test-connection', 'ProjectServerTestConnectionController@show')->name('project-server-test-connection.show');
 
     // Project's folders
     Route::get('projects/{project}/folders', 'ProjectFoldersController@index')->name('project-folders.index');
@@ -62,6 +61,24 @@ Route::group(['prefix' => 'api'], function() {
 
     // Repository
     Route::get('repositories/branches-tags', 'RepositoryBranchesTagsController@index')->name('repository-branches-tags.index');
+
+    // Notification
+    Route::get('notifications', 'NotificationController@index')->name('notifications.index');
+    Route::get('notifications/{notification}', 'NotificationController@show')->name('notifications.show');
+    Route::post('notifications/{notification}/read', 'NotificationController@markAsRead')->name('notifications.mark-as-read');
+
+    // Servers
+    Route::get('servers', 'ServerController@index')->name('servers.index');
+    Route::get('servers/{server}', 'ServerController@show')->name('servers.show');
+    Route::put('servers/{server}', 'ServerController@update')->name('servers.update');
+    Route::delete('servers/{server}', 'ServerController@destroy')->name('servers.destroy');
+    Route::post('servers', 'ServerController@store')->name('servers.create');
+
+    // Project's server test connection
+    Route::get('servers/{server}/test-connection', 'ServerTestConnectionController@show')->name('server-test-connection.show');
+
+    // Auth
+    Route::get('auth/user', 'AuthController@user')->name('deploy.me');
 });
 
 // Provider auth

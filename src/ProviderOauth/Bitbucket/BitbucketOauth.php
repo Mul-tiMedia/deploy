@@ -2,11 +2,21 @@
 
 namespace Deploy\ProviderOauth\Bitbucket;
 
+use Deploy\Contracts\ProviderOauth\ProviderOauthInterface;
 use Deploy\ProviderOauth\AbstractProviderOauth;
-use GuzzleHttp\Client;
 
-class BitbucketOauth extends AbstractProviderOauth
+class BitbucketOauth extends AbstractProviderOauth implements ProviderOauthInterface
 {
+    /**
+     * Returns provider friendly name typically stored in the providers table.
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        return 'bitbucket';
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -36,7 +46,7 @@ class BitbucketOauth extends AbstractProviderOauth
      */
     public function requestAccessToken($code)
     {
-        $client = new Client();
+        $client = $this->getHttpClient();
 
         $response = $client->request('POST', $this->getApiUrl(), [
             'auth' => [
@@ -57,12 +67,12 @@ class BitbucketOauth extends AbstractProviderOauth
      */
     public function refreshAccessToken($refreshToken)
     {
-        $client = new Client();
+        $client = $this->getHttpClient();
 
-        $response = $client->request('POST', $this->getApiUrl() . '/access_token', [
+        $response = $client->request('POST', $this->getApiUrl(), [
             'auth' => [
-                $this->clientId(),
-                $this->clientSecret(),
+                $this->getClientId(),
+                $this->getClientSecret(),
             ],
             'form_params' => [
                 'grant_type' => 'refresh_token',
@@ -70,6 +80,6 @@ class BitbucketOauth extends AbstractProviderOauth
             ]
         ]);
 
-        return json_decode($response->getBody());
+        return new BitbucketOauthResource(json_decode($response->getBody()));
     }
 }

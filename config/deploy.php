@@ -31,7 +31,7 @@ return [
 
     'ssh_key' => [
 
-        'path' => storage_path('app/keys'),
+        'path' => 'keys',
         'bit' => 4096,
         'comment' => 'deploy@domain.com',
 
@@ -75,6 +75,21 @@ return [
             'key'           => env('GITHUB_OAUTH_KEY', ''),
             'secret'        => env('GITHUB_OAUTH_SECRET', ''),
         ]
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Models
+    |--------------------------------------------------------------------------
+    |
+    | Application specific models.
+    |
+    */
+
+    'models' => [
+
+        'user' => \App\User::class,
 
     ],
 

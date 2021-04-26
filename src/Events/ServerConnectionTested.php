@@ -6,7 +6,6 @@ use Deploy\Models\Server;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -22,15 +21,13 @@ class ServerConnectionTested implements ShouldBroadcastNow
      */
     public $broadcastQueue = 'server-connection-test';
 
-    /**
-     * @var \Deploy\Models\Server
-     */
+    /** @var Server */
     public $server;
 
     /**
      * Create a new event instance.
      *
-     * @param  \Deploy\Models\Server $server
+     * @param Server $server
      * @return void
      */
     public function __construct(Server $server)
@@ -45,6 +42,21 @@ class ServerConnectionTested implements ShouldBroadcastNow
      */
     public function broadcastOn()
     {
-        return new PrivateChannel('project.' . $this->server->project_id);
+        return new PrivateChannel('user.' . $this->server->user_id);
+    }
+
+    /**
+     * Get the data to broadcast.
+     *
+     * @return array
+     */
+    public function broadcastWith()
+    {
+        return [
+            'server' => [
+                'id' => $this->server->id,
+                'connection_status' => (int) $this->server->connection_status,
+            ],
+        ];
     }
 }

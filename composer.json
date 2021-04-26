@@ -8,6 +8,10 @@
       "email": "jefftoddnielsen@gmail.com"
     }
   ],
+  "scripts": {
+    "test": "php ./vendor/phpunit/phpunit/phpunit --colors=always -v --testdox",
+    "test-coverage": "php -dxdebug.mode=coverage ./vendor/phpunit/phpunit/phpunit --coverage-html coverage"
+  },
   "autoload": {
     "psr-4": {
       "Deploy\\": "src/"
@@ -19,12 +23,23 @@
     }
   },
   "require": {
-    "symfony/process": "^4.1",
-    "guzzlehttp/guzzle": "~6.3.0",
-    "phpseclib/phpseclib": "^2.0"
+    "symfony/process": "^5.0",
+    "phpseclib/phpseclib": "^2.0",
+    "laravel/framework": "^7.0",
+    "guzzlehttp/guzzle": "^7.1@dev"
   },
   "require-dev": {
-    "phpunit/phpunit": "~6.0"
+    "phpunit/phpunit": "^8.5|^9.3",
+    "mockery/mockery": "^1.3",
+    "orchestra/testbench": "^5.0",
+    "doctrine/dbal": "^2.0"
   },
-  "minimum-stability": "dev"
+  "minimum-stability": "dev",
+  "extra": {
+    "laravel": {
+        "providers": [
+            "Deploy\\DeployServiceProvider"
+        ]
+    }
+  }
 }

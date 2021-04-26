@@ -10,8 +10,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Support\Facades\Crypt;
 
-class WriteEnvironmemtJob implements ShouldQueue
+class WriteEnvironmentJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -23,30 +24,52 @@ class WriteEnvironmemtJob implements ShouldQueue
     public $tries = 5;
 
     /**
-     * @var \Deploy\Processors\WriteEnvironmentProcessor
+     * @var Project
+     */
+    private $project;
+
+    /**
+     * @var Environment
+     */
+    private $environment;
+
+    /**
+     * @var WriteEnvironmentProcessor
      */
     protected $writeEnvironmentProcessor;
 
     /**
-     * Create a new job instance.
-     *
-     * @param  \Deploy\Models\Project $project
-     * @param  \Deploy\Models\Environment $environment
-     * @param  string $key
-     * @return void
+     * @var string
      */
-    public function __construct(Project $project, Environment $environment, $key)
+    protected $key;
+
+    /**
+     * Create a new job instance.
+     */
+    public function __construct(Project $project, Environment $environment, string $key)
     {
-        $this->writeEnvironmentProcessor = new WriteEnvironmentProcessor($project, $environment, $key);
+        $this->project = $project;
+        $this->environment = $environment;
+        $this->key = $key;
     }
 
     /**
      * Execute the job.
-     *
-     * @return void
      */
-    public function handle()
+    public function handle(WriteEnvironmentProcessor $processor)
     {
-        $this->writeEnvironmentProcessor->fire();
+        $processor
+            ->setProject($this->project)
+            ->setEnvironment($this->environment)
+            ->setKey($this->getDecryptedKey())
+            ->fire();
+    }
+
+    /**
+     * Returns the decrypted environment key.
+     */
+    public function getDecryptedKey(): string
+    {
+        return Crypt::decryptString($this->key);
     }
 }

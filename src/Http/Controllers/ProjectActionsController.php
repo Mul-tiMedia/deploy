@@ -2,20 +2,24 @@
 
 namespace Deploy\Http\Controllers;
 
+use Deploy\Http\Requests\HookOrderRequest;
+use Deploy\Models\Hook;
 use Deploy\Models\Project;
 use Deploy\Models\Action;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 class ProjectActionsController extends Controller
 {
     /**
-     * @var \Deploy\Models\Action
+     * @var Action
      */
     protected $action;
 
     /**
      * Instantiate ProjectActionsController
-     *
-     * @param \Deploy\Models\Action $action
      */
     public function __construct(Action $action)
     {
@@ -25,10 +29,9 @@ class ProjectActionsController extends Controller
     /**
      * List actions.
      *
-     * @param  \Deploy\Models\Project $project
-     * @return \Illuminate\Http\JsonResponse
+     * @throws AuthorizationException
      */
-    public function index(Project $project)
+    public function index(Project $project): JsonResponse
     {
         $this->authorize('view', $project);
 
@@ -40,13 +43,42 @@ class ProjectActionsController extends Controller
     }
 
     /**
+     * Bulk update the order of the hooks.
+     *
+     * @throws AuthorizationException
+     */
+    public function updateHookOrder(HookOrderRequest $request, Project $project, Action $action): JsonResponse
+    {
+        $this->authorize('view', $project);
+
+        $hookOrders = collect($request->input('hooks', []));
+
+        // Ensure we only return hooks belonging to this user's project.
+        $projectHooks = Hook::where('project_id', $project->id)
+            ->where('action_id', $action->id)
+            ->whereIn('id', $hookOrders->pluck('id'))
+            ->get();
+
+        // Loop through the queried project hooks. Using the mapped position,
+        // order values from the request payload, update the project hooks.
+        foreach ($projectHooks as $projectHook) {
+            if ($hookOrder = Arr::get($hookOrders, $projectHook->id)) {
+                $projectHook->update([
+                    'position' => Arr::get($hookOrder, 'position'),
+                    'order' => Arr::get($hookOrder, 'order'),
+                ]);
+            }
+        }
+
+        return response()->json(null, 204);
+    }
+
+    /**
      * List hooks belonging to specified project's actions.
      *
-     * @param  \Deploy\Models\Project $project
-     * @param  \Deploy\Models\Action $action
-     * @return \Illuminate\Http\JsonResponse
+     * @throws AuthorizationException
      */
-    public function show(Project $project, Action $action)
+    public function show(Project $project, Action $action): JsonResponse
     {
         $this->authorize('view', $project);
 

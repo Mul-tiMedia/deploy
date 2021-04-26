@@ -3,14 +3,23 @@ body, html {
 }
 
 #app {
-  display: flex;
-  flex: 1;
   height: 100%;
-  width: 100%;
+}
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.body {
+  display: flex;
+  height: 100%;
+  min-height: 0;
 }
 
 .content {
-  padding: 20px;
+  padding: 30px 20px;
   max-width: 1200px;
   margin: 0 auto;
 
@@ -19,21 +28,65 @@ body, html {
   }
 }
 
-.wrapper {
-  display: flex;
-  width: 100%;
-}
-
 .main-content {
   overflow: auto;
   width: 100%;
 }
 
-.heading {
-  margin-bottom: 1em;
+.project-nav {
+  @media (max-width: 768px) {
+    padding: 15px 0 0;
+  }
+
+  &__heading {
+    padding: 30px 20px 0;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  &__menu {
+    list-style: none;
+    margin: 0;
+    padding: 0 0;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
   h2 {
-    font-weight: 600;
-    margin: .5em 0;
-    font-size: 18px;
+    margin: .4em 0;
+    font-size: 22px;
+    color: #111;
+  }
+}
+
+.project-nav__menu {
+  li {
+    display: inline-block;
+    margin-right: 25px;
+  }
+
+  a {
+    display: block;
+    padding: 10px 0;
+    color: $text-color;
+
+    &.active {
+      color: darken($text-color, 50%);
+    }
+  }
+
+  .fa {
+    margin-right: 6px;
+    opacity: .5;
+  }
+}
+
+.heading {
+  margin-bottom: 18px;
+
+  h2 {
+    margin: 8px 0;
+    font-size: 22px;
+    color: #111;
   }
 }

@@ -2,25 +2,35 @@
 
 namespace Deploy\Http\Controllers;
 
-use Deploy\Http\Requests\EnvironmentRequest;
+use Deploy\Http\Requests\EnvironmentResetRequest;
 use Deploy\Models\Project;
 use Deploy\Models\Environment;
 use Deploy\Environment\EnvironmentEncrypter;
+use Illuminate\Http\JsonResponse;
 
 class ProjectEnvironmentResetController extends Controller
 {
+    /** @var EnvironmentEncrypter */
+    private $environmentEncrypter;
+
+    /**
+     * ProjectEnvironmentResetController constructor.
+     */
+    public function __construct(EnvironmentEncrypter $environmentEncrypter)
+    {
+        $this->environmentEncrypter = $environmentEncrypter;
+    }
+
     /**
      * Reset environment.
-     *
-     * @param  \Deploy\Http\Requests\EnvironmentRequest $request
-     * @param  \Deploy\Models\Project $project
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function update(EnvironmentRequest $request, Project $project)
+    public function update(EnvironmentResetRequest $request, Project $project): JsonResponse
     {
         $this->authorize('view', $project);
 
-        $encrypter = new EnvironmentEncrypter($request->get('key'));
+        $encrypter = $this->environmentEncrypter
+            ->setKey($request->get('key'));
+
         $environment = Environment::where('project_id', $project->id)->first();
 
         if (!$environment) {

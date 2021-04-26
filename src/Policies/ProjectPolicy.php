@@ -11,23 +11,13 @@ class ProjectPolicy
     use HandlesAuthorization;
 
     /**
-     * Create a new policy instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        //
-    }
-
-    /**
      * Show project belonging to user.
      *
-     * @param \App\User $user
-     * @param \Deploy\Models\Project $project
+     * @param User $user
+     * @param Project $project
      * @return bool
      */
-    public function view(User $user, Project $project)
+    public function view($user, Project $project): bool
     {
         return $user->id === $project->user->id;
     }
@@ -35,11 +25,11 @@ class ProjectPolicy
     /**
      * Update project belonging to user.
      *
-     * @param \App\User $user
-     * @param \Deploy\Models\Project $project
+     * @param User $user
+     * @param Project $project
      * @return bool
      */
-    public function update(User $user, Project $project)
+    public function update($user, Project $project): bool
     {
         return $user->id === $project->user->id;
     }
@@ -47,11 +37,11 @@ class ProjectPolicy
     /**
      * Delete project belonging to user.
      *
-     * @param \App\User $user
-     * @param \Deploy\Models\Project $project
+     * @param User $user
+     * @param Project $project
      * @return bool
      */
-    public function delete(User $user, Project $project)
+    public function delete($user, Project $project): bool
     {
         return $user->id === $project->user->id;
     }

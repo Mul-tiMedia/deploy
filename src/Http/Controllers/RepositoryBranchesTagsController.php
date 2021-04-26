@@ -3,31 +3,50 @@
 namespace Deploy\Http\Controllers;
 
 use Deploy\Models\Provider;
+use Deploy\ProviderOauth\ProviderOauthFactory;
 use Deploy\ProviderOauthManager;
 use Deploy\ProviderRepositoryManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class RepositoryBranchesTagsController extends Controller
 {
+    /** @var ProviderOauthManager */
+    private $providerOauthManager;
+
+    /** @var ProviderRepositoryManager */
+    private $providerRepositoryManager;
+
+    /**
+     * RepositoryBranchesTagsController constructor.
+     */
+    public function __construct(
+        ProviderOauthManager $providerOauthManager,
+        ProviderRepositoryManager $providerRepositoryManager
+    ) {
+        $this->providerOauthManager = $providerOauthManager;
+        $this->providerRepositoryManager = $providerRepositoryManager;
+    }
+
     /**
      * Return repository's branch list.
-     *
-     * @param  \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $providerId = $request->get('provider_id');
         $repository = $request->get('repository');
 
         $provider = Provider::find($providerId);
 
-        if (!is_object($provider)) {
+        if (!$provider instanceof Provider) {
             return response()->json(['Provider not found.'], 404);
         }
 
-        $providerRepository = new ProviderRepositoryManager();
-        $driver = $providerRepository->driver($provider->friendly_name, $this->accessToken($provider));
+        $driver = $this->providerRepositoryManager
+            ->driver(
+                $provider->friendly_name,
+                $this->accessToken($provider)
+            );
 
         return response()->json([
             'branches' => $driver->branches($repository),
@@ -37,13 +56,16 @@ class RepositoryBranchesTagsController extends Controller
 
     /**
      * Retrieve access token.
-     *
-     * @param  \Deploy\Models\Provider $provider
-     * @return string
      */
-    protected function accessToken($provider)
+    protected function accessToken(Provider $provider): string
     {
-        $providerOauth = new ProviderOauthManager($provider, auth()->user());
+        $providerOauth = ProviderOauthFactory::create($provider->friendly_name);
+
+        $user = auth()->user();
+
+        $providerOauth = $this->providerOauthManager
+            ->setProvider($providerOauth)
+            ->setUser($user);
 
         return $providerOauth->getAccessToken();
     }

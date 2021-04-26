@@ -6,35 +6,44 @@ use Deploy\Http\Requests\ProjectRequest;
 use Deploy\Http\Requests\ProjectGeneralRequest;
 use Deploy\Models\Project;
 use Deploy\Models\Deployment;
-use Deploy\Models\Server;
+use Deploy\Models\ProjectServer;
 use Deploy\Models\Environment;
+use Deploy\Models\Hook;
+use Deploy\Models\Process;
 use Deploy\Resources\ProjectResource;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 
 class ProjectController extends Controller
 {
     /**
      * List projects.
-     *
-     * @return \Illuminate\Http\JsonResponse
      */
     public function index()
     {
-        $projects = Project::where('user_id', auth()->id())->get();
+        $projects = Project::withCount([
+                'deployments as daily_deployments_count' => function ($query) {
+                    $query->byToday(1);
+                },
+                'deployments as weekly_deployments_count' => function ($query) {
+                    $query->byDaysAgo(7);
+                }
+            ])
+            ->where('user_id', auth()->id())
+            ->get();
 
         return ProjectResource::collection($projects);
     }
 
     /**
      * Create project.
-     *
-     * @param  \Deploy\Http\Requests\ProjectRequest $request
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function store(ProjectRequest $request)
+    public function store(ProjectRequest $request): JsonResponse
     {
         $project = new Project();
         $project->fill([
-            'key'=> str_random(40),
+            'key'=> Str::random(40),
             'user_id' => auth()->id(),
             'name'=> $request->get('name'),
             'provider_id' => $request->get('provider_id'),
@@ -51,14 +60,13 @@ class ProjectController extends Controller
     /**
      * Display project details and server setup.
      *
-     * @param  \Deploy\Models\Project $project
-     * @return \Illuminate\Http\Response
+     * @throws AuthorizationException
      */
-    public function show(Project $project)
+    public function show(Project $project): JsonResponse
     {
         $this->authorize('view', $project);
 
-        $project = $project->withCount([
+        $project = $project::withCount([
                 'deployments as daily_deployments_count' => function ($query) {
                     $query->byToday(1);
                 },
@@ -68,17 +76,15 @@ class ProjectController extends Controller
             ])
             ->find($project->id);
 
-        return response()->json($project);
+        return response()->json(new ProjectResource($project));
     }
 
     /**
      * Update project.
      *
-     * @param  \Deploy\Http\Requests\ProjectGeneralRequest $request
-     * @param  \Deploy\Models\Project $project
-     * @return \Illuminate\Http\JsonResponse
+     * @throws AuthorizationException
      */
-    public function update(ProjectGeneralRequest $request, Project $project)
+    public function update(ProjectGeneralRequest $request, Project $project): JsonResponse
     {
         $this->authorize('update', $project);
 
@@ -91,16 +97,22 @@ class ProjectController extends Controller
     /**
      * Delete project.
      *
-     * @param  \Deploy\Models\Project $project
-     * @return \Illuminate\Http\JsonResponse
+     * @throws AuthorizationException
      */
-    public function destroy(Project $project)
+    public function destroy(Project $project): JsonResponse
     {
         $this->authorize('delete', $project);
 
-        Server::where('project_id', $project->id)->delete();
+        // Remove env associated with project
         Environment::where('project_id', $project->id)->delete();
+
+        // Remove deployment related data associated with project
+        Process::where('project_id', $project->id)->delete();
+        Hook::where('project_id', $project->id)->delete();
         Deployment::where('project_id', $project->id)->delete();
+
+        // Remove servers from project. Notes: Servers will not be deleted.
+        ProjectServer::where('project_id', $project->id)->delete();
 
         $project->delete();
 

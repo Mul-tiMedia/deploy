@@ -3,29 +3,38 @@
 namespace Deploy\Http\Controllers;
 
 use Deploy\Http\Requests\EnvironmentRequest;
-use Deploy\Jobs\WriteEnvironmemtJob;
+use Deploy\Jobs\WriteEnvironmentJob;
 use Deploy\Models\Project;
 use Deploy\Models\Environment;
 use Deploy\Environment\EnvironmentEncrypter;
 use Deploy\Models\Server;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Crypt;
 
 class ProjectEnvironmentController extends Controller
 {
+    /** @var EnvironmentEncrypter */
+    private $environmentEncrypter;
+
+    /**
+     * ProjectEnvironmentController constructor.
+     */
+    public function __construct(EnvironmentEncrypter $environmentEncrypter)
+    {
+        $this->environmentEncrypter = $environmentEncrypter;
+    }
+
     /**
      * Update environment.
-     *
-     * @param EnvironmentRequest $request
-     * @param Project $project
-     * @return \Illuminate\Http\JsonResponse
-     * @throws \Illuminate\Auth\Access\AuthorizationException
      */
-    public function update(EnvironmentRequest $request, Project $project)
+    public function update(EnvironmentRequest $request, Project $project): JsonResponse
     {
         $this->authorize('view', $project);
 
         $environment = Environment::where('project_id', $project->id)->first();
 
-        $encrypter = new EnvironmentEncrypter($request->get('key'));
+        $encrypter = $this->environmentEncrypter
+            ->setKey($request->get('key'));
 
         if (!$environment) {
             return response()->json(
@@ -37,18 +46,30 @@ class ProjectEnvironmentController extends Controller
         $environment->contents = $encrypter->encrypt($request->get('contents'));
         $environment->save();
 
-        // Sync servers to environment
-        $servers = Server::where('project_id', $project->id)
+        // @TODO Move server check to request
+        $servers = Server::where('user_id', $project->user_id)
             ->whereIn('id', $request->get('servers'))
             ->get()
             ->pluck('id')
             ->toArray();
 
-        if (is_array($servers)) {
-            $environment->environmentServers()->sync($servers);
+        if (empty($servers)) {
+            return response()->json([
+                'errors' => [
+                    'servers' => [
+                        'No servers were provided',
+                    ]
+                ]
+            ], 422);
         }
 
-        dispatch(new WriteEnvironmemtJob($project, $environment, $request->get('key')));
+        $environment->environmentServers()->sync($servers);
+
+        // Encrypt the user's environment key before dispatching the queue event not passed
+        // in the jobs's payload in plaintext. We will decrypt when the job is processed.
+        $encryptedKey = Crypt::encryptString($request->get('key'));
+
+        dispatch(new WriteEnvironmentJob($project, $environment, $encryptedKey));
 
         return response()->json(null, 204);
     }

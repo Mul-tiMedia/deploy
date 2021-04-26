@@ -3,41 +3,55 @@
 namespace Deploy\Http\Controllers;
 
 use Deploy\Models\Provider;
+use Deploy\ProviderOauth\ProviderOauthFactory;
 use Deploy\ProviderOauthManager;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class ProviderAuthController extends Controller
 {
+    /** @var ProviderOauthManager */
+    private $providerOauthManager;
+
+    /**
+     * ProviderAuthController constructor.
+     */
+    public function __construct(ProviderOauthManager $providerOauthManager)
+    {
+        $this->providerOauthManager = $providerOauthManager;
+    }
+
     /**
      * Redirect the logged in user to their chosen provider so that they can
      * authorize this application to access the user's information.
-     *
-     * @param  string $providerFriendlyName
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function authorizeUser($providerFriendlyName)
+    public function authorizeUser(string $providerFriendlyName): RedirectResponse
     {
-        $provider = Provider::where('friendly_name', $providerFriendlyName)->first();
+        $provider = ProviderOauthFactory::create($providerFriendlyName);
 
-        $providerOauth = new ProviderOauthManager($provider, auth()->user());
+        $user = auth()->user();
 
-        return redirect($providerOauth->getAuthorizeUrl());
+        $authorizerUrl = $this->providerOauthManager
+            ->setProvider($provider)
+            ->setUser($user)
+            ->getAuthorizeUrl();
+
+        return redirect($authorizerUrl);
     }
 
     /**
      * Retrieve the access token from the provider.
-     *
-     * @param  \Illuminate\Http\Request $request
-     * @param  string $providerFriendlyName
-     * @return \Illuminate\Http\RedirectResponse
      */
-    public function providerAccessToken(Request $request, $providerFriendlyName)
+    public function providerAccessToken(Request $request, string $providerFriendlyName): RedirectResponse
     {
-        $provider = Provider::where('friendly_name', $providerFriendlyName)->first();
+        $providerOauth = ProviderOauthFactory::create($providerFriendlyName);
+        
+        $user = auth()->user();
 
-        $providerOauth = new ProviderOauthManager($provider, auth()->user());
-
-        $providerOauth->requestAccessToken($request->get('code'));
+        $this->providerOauthManager
+            ->setProvider($providerOauth)
+            ->setUser($user)
+            ->requestAccessToken($request->get('code'));
 
         return redirect()->route('deploy');
     }

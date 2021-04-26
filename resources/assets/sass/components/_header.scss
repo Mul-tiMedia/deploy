@@ -1,0 +1,30 @@
+.header {
+  background: #fff;
+  padding: 15px 18px;
+  display: flex;
+  flex-direction: row;
+  box-shadow: 0 2px 3px #21485b21;
+  position: relative;
+  z-index: 2;
+
+  &__branding {
+    margin-right: auto;
+    color: #111;
+  }
+
+  h1 {
+    font-weight: 600;
+    font-size: $font-size-base;
+    margin: 0;
+    padding: 0;
+    line-height: 1.5em;
+  }
+
+  a {
+    color: #111;
+
+    &:hover {
+      color: #111;
+    }
+  }
+}
